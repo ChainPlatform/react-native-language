@@ -75,10 +75,19 @@ class LanguageManager {
     }
 
     async loadLanguage(lang) {
-        const translations = await this._fetchLanguage(lang);
-        this.translations[lang] = translations || {};
-        this.currentLanguage = lang;
-        await this.storage.set(this.STORAGE_KEY, lang);
+        const normalized = this.normalizeLocale(lang);
+        if (this.currentLanguage === normalized && this.translations[normalized]) {
+            return;
+        }
+        const translations = await this._fetchLanguage(normalized);
+        this.translations[normalized] = translations || {};
+        this.currentLanguage = normalized;
+        try {
+            const saved = await this.storage.get(this.STORAGE_KEY);
+            if (saved !== normalized) {
+                await this.storage.set(this.STORAGE_KEY, normalized);
+            }
+        } catch { }
     }
 
     async _fetchLanguage(lang) {
@@ -128,6 +137,21 @@ class LanguageManager {
             return String(number);
         }
     }
+
+    format(type, value, options = {}) {
+        try {
+            if (typeof Intl[type] !== "function") {
+                console.warn(`Intl.${type} not found`);
+                return value;
+            }
+            const lang = this.currentLanguage || this.fallbackLanguage;
+            const formatter = new Intl[type](lang, options);
+            if (typeof formatter.format === "function") return formatter.format(value);
+            return value;
+        } catch {
+            return value;
+        }
+    }
 }
 
 export const Language = new LanguageManager();
@@ -138,6 +162,7 @@ export const LanguageContext = React.createContext({
     language: "en",
     changeLanguage: () => { },
     formatNumber: () => { },
+    format: () => { },
 });
 
 /* ---------------- Provider ---------------- */
@@ -163,6 +188,7 @@ export class LanguageProvider extends React.Component {
             t: Language.t,
             changeLanguage: Language.changeLanguage.bind(Language),
             formatNumber: Language.formatNumber.bind(Language),
+            format: Language.format.bind(Language),
         };
         return (
             <LanguageContext.Provider value={ctx}>
@@ -184,6 +210,7 @@ export function withLanguage(WrappedComponent) {
                         language={ctx.language}
                         changeLanguage={ctx.changeLanguage}
                         formatNumber={ctx.formatNumber}
+                        format={ctx.format}
                     />
                 )}
             </LanguageContext.Consumer>

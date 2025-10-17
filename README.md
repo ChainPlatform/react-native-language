@@ -36,6 +36,7 @@ A lightweight, modular internationalization (i18n) manager for React Native and 
 - 🌍 Lazy load or fetch translations from API
 - 🧩 React Context + HOC support (`withLanguage`)
 - ⚡️ Zero dependencies (except React + RNLocalize)
+- 🔢 Unified formatting via `Language.format(type, value, options)`
 
 ---
 
@@ -47,7 +48,7 @@ npm install @chainplatform/language
 yarn add @chainplatform/language
 ```
 
-You also need to install `react-native-localize` `@chainplatform/sdk`:
+You also need to install `react-native-localize` and `@chainplatform/sdk`:
 
 ```bash
 npm install react-native-localize @chainplatform/sdk
@@ -142,7 +143,7 @@ export default withLanguage(SettingsScreen);
 | Prop | Type | Description |
 |------|------|-------------|
 | `translations` | `{ [lang: string]: object }` | Static translation dictionary |
-| `fallback` | `string` | Fallback language key (default: `"en"`) |
+| `fallback` | `string` | Fallback language key (default: "en") |
 | `language` | `string` | Initial language (optional) |
 | `lazyLoad` | `(lang: string) => Promise<object>` | Async loader for dynamic imports |
 | `loadFromApi` | `(lang: string) => Promise<object>` | Load translation from API |
@@ -158,6 +159,22 @@ export default withLanguage(SettingsScreen);
 | `Language.t(key, vars?)` | Translate key with optional variables |
 | `Language.changeLanguage(lang)` | Switch current language |
 | `Language.onLanguageChange(cb)` | Subscribe to language changes |
+| `Language.format(type, value, options?)` | Generic Intl formatter (`NumberFormat`, `DateTimeFormat`, `RelativeTimeFormat`, etc.) |
+
+**Example:**
+
+```tsx
+import { Language } from "@chainplatform/language";
+
+// Format number
+console.log(Language.format("NumberFormat", 12345.678));
+
+// Format date
+console.log(Language.format("DateTimeFormat", new Date(), { dateStyle: "full" }));
+
+// Format relative time
+console.log(Language.format("RelativeTimeFormat", -1, { numeric: "auto", style: "long" }));
+```
 
 ---
 
@@ -169,6 +186,7 @@ React Context that provides:
   t: (key: string, vars?: Record<string, any>) => string;
   language: string;
   changeLanguage: (lang: string) => Promise<void>;
+  format: (type: string, value: any, options?: object) => string;
 }
 ```
 
@@ -181,7 +199,8 @@ Higher-Order Component that injects props:
 {
   t,
   language,
-  changeLanguage
+  changeLanguage,
+  format
 }
 ```
 
@@ -229,6 +248,7 @@ const storage = new MMKV();
   ```js
   import { Language } from "@chainplatform/language";
   console.log(Language.t("hello"));
+  console.log(Language.format("NumberFormat", 12345.678));
   ```
 
 ---

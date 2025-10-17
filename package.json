@@ -1,6 +1,6 @@
 {
   "name": "@chainplatform/language",
-  "version": "0.1.1",
+  "version": "0.1.3",
   "description": "@chainplatform/language",
   "main": "index.js",
   "author": "Chain Platform <santran686@gmail.com> (https://chainplatform.net/)",
