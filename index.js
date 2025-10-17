@@ -119,6 +119,15 @@ class LanguageManager {
             vars[name] === undefined ? `{${name}}` : String(vars[name])
         );
     };
+
+    formatNumber(number, options = {}) {
+        try {
+            const lang = this.currentLanguage || this.fallbackLanguage;
+            return new Intl.NumberFormat(lang, options).format(number);
+        } catch (e) {
+            return String(number);
+        }
+    }
 }
 
 export const Language = new LanguageManager();
@@ -128,6 +137,7 @@ export const LanguageContext = React.createContext({
     t: (key) => key,
     language: "en",
     changeLanguage: () => { },
+    formatNumber: () => { },
 });
 
 /* ---------------- Provider ---------------- */
@@ -152,6 +162,7 @@ export class LanguageProvider extends React.Component {
             language: this.state.language,
             t: Language.t,
             changeLanguage: Language.changeLanguage.bind(Language),
+            formatNumber: Language.formatNumber.bind(Language),
         };
         return (
             <LanguageContext.Provider value={ctx}>
@@ -172,6 +183,7 @@ export function withLanguage(WrappedComponent) {
                         t={ctx.t}
                         language={ctx.language}
                         changeLanguage={ctx.changeLanguage}
+                        formatNumber={ctx.formatNumber}
                     />
                 )}
             </LanguageContext.Consumer>
