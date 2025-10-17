@@ -1,0 +1,34 @@
+{
+  "name": "@chainplatform/language",
+  "version": "0.1.0",
+  "description": "@chainplatform/language",
+  "main": "index.js",
+  "author": "Chain Platform <santran686@gmail.com> (https://chainplatform.net/)",
+  "license": "MIT",
+  "keywords": [
+    "react",
+    "react-native",
+    "react-native-web",
+    "@chainplatform/sdk",
+    "@chainplatform/language",
+    "react-native-mmkv",
+    "react-native-nitro-modules",
+    "react-native-localize"
+  ],
+  "homepage": "https://github.com/ChainPlatform/react-native-language",
+  "bugs": "https://github.com/ChainPlatform/react-native-language/issues",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/ChainPlatform/react-native-language.git"
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "*",
+    "@chainplatform/sdk": "*",
+    "react-native-localize": "*",
+    "react-native-web": "*",
+    "react-native-mmkv": "*",
+    "react-native-nitro-modules": "*"
+  }
+}
