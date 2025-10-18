@@ -1,5 +1,6 @@
-# Chain Platform Language
-@chainplatform/language is a React Native library implement for react-native and react-native-web.
+# Language Manager for React Native
+
+A lightweight and flexible language management system for React Native apps. Supports local storage, lazy loading, API-based translation loading, and full React Context integration.
 
 <p align="center">
   <a href="https://github.com/ChainPlatform/react-native-language/blob/HEAD/LICENSE">
@@ -22,21 +23,17 @@
   </a>
 </p>
 
-# 🗣️ @chainplatform/language
-
-A lightweight, modular internationalization (i18n) manager for React Native and React Native Web apps — designed for dynamic translation loading, persistent language storage, and context-based rendering.
-
 ---
 
 ## 🚀 Features
-
-- ✅ Simple and clean API (`Language.t(key)` or `t(key)` via context)
-- 🔄 Auto language detection using `react-native-localize`
-- 💾 Persistent storage with custom `get` / `set` support
-- 🌍 Lazy load or fetch translations from API
-- 🧩 React Context + HOC support (`withLanguage`)
-- ⚡️ Zero dependencies (except React + RNLocalize)
-- 🔢 Unified formatting via `Language.format(type, value, options)`
+- Persistent language storage
+- Auto-detect device locale
+- Lazy-load translation files
+- Optional API-based translation loading
+- Simple string interpolation
+- Number and date formatting using `Intl`
+- React Context + HOC integration
+- Type-safe and lightweight
 
 ---
 
@@ -48,39 +45,27 @@ npm install @chainplatform/language
 yarn add @chainplatform/language
 ```
 
-You also need to install `react-native-localize` and `@chainplatform/sdk`:
-
-```bash
-npm install react-native-localize @chainplatform/sdk
-```
-
 ---
 
-## 🧠 Basic Usage
+## 🧠 Usage
 
-### 1️⃣ Initialize and wrap your app with `LanguageProvider`
+### 1️⃣ Basic Setup
 
-```tsx
-// App.js or App.tsx
+```jsx
 import React from "react";
 import { LanguageProvider } from "@chainplatform/language";
-import MainNavigation from "./MainNavigation";
+import App from "./App";
 
-const translations = {
-  en: { hello: "Hello World", change: "Change Language" },
-  vi: { hello: "Xin chào", change: "Đổi ngôn ngữ" },
-};
-
-export default function App() {
+export default function Root() {
   return (
     <LanguageProvider
       fallback="en"
-      translations={translations}
-      // Optionally:
-      // lazyLoad={async (lang) => import(`./locales/${lang}.json`)}
-      // storage={{ get: customGet, set: customSet }}
+      translations={{
+        en: { hello: "Hello" },
+        vi: { hello: "Xin chào" }
+      }}
     >
-      <MainNavigation />
+      <App />
     </LanguageProvider>
   );
 }
@@ -88,171 +73,158 @@ export default function App() {
 
 ---
 
-### 2️⃣ Using `LanguageContext` inside components
+### 2️⃣ Using the `t()` function
 
-```tsx
+You can use the `LanguageContext` hook or `withLanguage` HOC to access translation functions.
+
+#### ✅ Using React Context
+
+```jsx
 import React, { useContext } from "react";
 import { LanguageContext } from "@chainplatform/language";
-import { Button, Text, View } from "react-native";
 
-export default function HomeScreen() {
-  const { t, language, changeLanguage } = useContext(LanguageContext);
+export default function MyComponent() {
+  const { t, changeLanguage } = useContext(LanguageContext);
 
   return (
-    <View>
+    <>
       <Text>{t("hello")}</Text>
-      <Button
-        title={t("change")}
-        onPress={() => changeLanguage(language === "en" ? "vi" : "en")}
-      />
-    </View>
+      <Button title="Switch to Vietnamese" onPress={() => changeLanguage("vi")} />
+    </>
   );
 }
 ```
 
----
+#### ✅ Using HOC
 
-### 3️⃣ Using the HOC `withLanguage`
-
-```tsx
+```jsx
 import React from "react";
 import { withLanguage } from "@chainplatform/language";
-import { Button, Text } from "react-native";
 
-function SettingsScreen({ t, language, changeLanguage }) {
-  return (
-    <>
-      <Text>{t("hello")}</Text>
-      <Button
-        title={t("change")}
-        onPress={() => changeLanguage(language === "en" ? "vi" : "en")}
-      />
-    </>
-  );
+function MyComponent({ t, language }) {
+  return <Text>{t("hello")} ({language})</Text>;
 }
 
-export default withLanguage(SettingsScreen);
+export default withLanguage(MyComponent);
+```
+
+---
+
+### 3️⃣ Lazy Loading Translations
+
+```js
+<LanguageProvider
+  fallback="en"
+  lazyLoad={async (lang) => {
+    switch (lang) {
+      case "vi":
+        return await import("./locales/vi.json").then(m => m.default);
+      case "en":
+        return await import("./locales/en.json").then(m => m.default);
+      default:
+        return {};
+    }
+  }}
+>
+  <App />
+</LanguageProvider>
+```
+
+---
+
+### 4️⃣ API-Based Loading
+
+```js
+<LanguageProvider
+  fallback="en"
+  loadFromApi={async (lang) => {
+    const res = await fetch(`https://example.com/i18n/${lang}.json`);
+    return await res.json();
+  }}
+>
+  <App />
+</LanguageProvider>
+```
+
+---
+
+### 5️⃣ Persistent Storage
+
+By default, it uses `@chainplatform/sdk`’s `retrieveStorage` and `saveStorage`.  
+You can override with your own implementation:
+
+```js
+<LanguageProvider
+  storage={{
+    get: async (key) => AsyncStorage.getItem(key),
+    set: async (key, val) => AsyncStorage.setItem(key, val)
+  }}
+>
+  <App />
+</LanguageProvider>
+```
+
+---
+
+### 6️⃣ Formatting Helpers
+
+```js
+t("welcome", { name: "John" }); // "Welcome, John"
+
+formatNumber(123456.78); // 123,456.78 or 123.456,78 depending on locale
+format("DateTimeFormat", new Date(), { dateStyle: "medium" });
 ```
 
 ---
 
 ## ⚙️ API Reference
 
-### 🔹 `LanguageProvider` Props
+### `Language.init(options)`
+Initializes the language manager.  
+Called automatically by `LanguageProvider`.
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `translations` | `{ [lang: string]: object }` | Static translation dictionary |
-| `fallback` | `string` | Fallback language key (default: "en") |
-| `language` | `string` | Initial language (optional) |
-| `lazyLoad` | `(lang: string) => Promise<object>` | Async loader for dynamic imports |
-| `loadFromApi` | `(lang: string) => Promise<object>` | Load translation from API |
-| `storage` | `{ get: (key) => Promise<any>, set: (key, val) => Promise<void> }` | Custom persistent storage |
-
----
-
-### 🔹 `Language` Static Methods
-
-| Method | Description |
-|---------|-------------|
-| `Language.init(options)` | Initialize language manager manually |
-| `Language.t(key, vars?)` | Translate key with optional variables |
-| `Language.changeLanguage(lang)` | Switch current language |
-| `Language.onLanguageChange(cb)` | Subscribe to language changes |
-| `Language.format(type, value, options?)` | Generic Intl formatter (`NumberFormat`, `DateTimeFormat`, `RelativeTimeFormat`, etc.) |
-
-**Example:**
-
-```tsx
-import { Language } from "@chainplatform/language";
-
-// Format number
-console.log(Language.format("NumberFormat", 12345.678));
-
-// Format date
-console.log(Language.format("DateTimeFormat", new Date(), { dateStyle: "full" }));
-
-// Format relative time
-console.log(Language.format("RelativeTimeFormat", -1, { numeric: "auto", style: "long" }));
-```
+| Option | Type | Description |
+|--------|------|-------------|
+| fallback | string | Default fallback language |
+| translations | object | Predefined translations |
+| lazyLoad | function | Async function to load translation file dynamically |
+| loadFromApi | function | Async function to fetch translations from API |
+| language | string | Force set initial language |
+| storage | object | Custom `{ get, set }` async storage methods |
+| storage_key | string | Custom key for language storage |
 
 ---
 
-### 🔹 `LanguageContext`
+### `Language.t(key, vars)`
+Translates a key with optional variables.
 
-React Context that provides:
-```ts
+### `Language.changeLanguage(lang)`
+Changes the current language and saves it to storage.
+
+### `Language.onLanguageChange(callback)`
+Subscribes to language changes.
+
+---
+
+## 🧩 Example Translation Files
+
+**`locales/en.json`**
+```json
 {
-  t: (key: string, vars?: Record<string, any>) => string;
-  language: string;
-  changeLanguage: (lang: string) => Promise<void>;
-  format: (type: string, value: any, options?: object) => string;
+  "hello": "Hello",
+  "welcome": "Welcome, {name}!"
 }
 ```
 
----
-
-### 🔹 `withLanguage(WrappedComponent)`
-
-Higher-Order Component that injects props:
-```ts
+**`locales/vi.json`**
+```json
 {
-  t,
-  language,
-  changeLanguage,
-  format
+  "hello": "Xin chào",
+  "welcome": "Chào mừng, {name}!"
 }
 ```
-
----
-
-## 🧩 Example: Dynamic Import
-
-```tsx
-<LanguageProvider
-  lazyLoad={async (lang) => {
-    const mod = await import(`../locales/${lang}.json`);
-    return mod.default;
-  }}
->
-  <App />
-</LanguageProvider>
-```
-
----
-
-## 💾 Storage Example
-
-You can provide custom storage (e.g., using MMKV or AsyncStorage):
-
-```tsx
-import { MMKV } from "react-native-mmkv";
-const storage = new MMKV();
-
-<LanguageProvider
-  storage={{
-    get: async (key) => storage.getString(key),
-    set: async (key, val) => storage.set(key, val),
-  }}
->
-  <App />
-</LanguageProvider>
-```
-
----
-
-## 🧪 Debug Tips
-
-- If translations don’t update, ensure your `LanguageProvider` wraps **the root of navigation** (not each screen).
-- You can access the singleton `Language` instance anywhere:
-  ```js
-  import { Language } from "@chainplatform/language";
-  console.log(Language.t("hello"));
-  console.log(Language.format("NumberFormat", 12345.678));
-  ```
 
 ---
 
 ## 📄 License
-
-MIT © Chain Platform
+MIT License © ChainPlatform

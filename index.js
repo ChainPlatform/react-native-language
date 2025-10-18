@@ -25,12 +25,10 @@ class LanguageManager {
         this.translations = {};
         this.fallbackLanguage = "en";
         this.currentLanguage = "en";
-        this.STORAGE_KEY = "APP_LANGUAGE";
-        this.CACHE_KEY_PREFIX = "CPL_CACHE_";
+        this.STORAGE_KEY = "USER_LANGUAGE";
         this.emitter = new SimpleEmitter();
         this.lazyLoadFn = null;
         this.loadFromApiFn = null;
-        this.cacheTtl = 24 * 60 * 60 * 1000;
         this.initialized = false;
         this.storage = { get: defaultGet, set: defaultSet };
     }
@@ -54,62 +52,76 @@ class LanguageManager {
     async init(options = {}) {
         if (this.initialized) return this.currentLanguage;
 
+        // console.log("Language.init() called", { initialized: this.initialized });
+
         this.fallbackLanguage = options.fallback || "en";
         this.translations = options.translations || {};
         this.lazyLoadFn = options.lazyLoad || null;
         this.loadFromApiFn = options.loadFromApi || null;
         this.storage = options.storage || this.storage;
+        this.STORAGE_KEY = options.storage_key || this.STORAGE_KEY;
 
-        let lang = options.language;
-        if (!lang || !String(lang).trim()) {
+        let lang = null;
+        try {
             const saved = await this.storage.get(this.STORAGE_KEY);
-            lang = saved && String(saved).trim()
-                ? this.normalizeLocale(saved)
+            if (saved && String(saved).trim()) {
+                lang = this.normalizeLocale(saved);
+            }
+        } catch (e) {
+            console.warn("Language.init() read storage failed:", e);
+        }
+
+        if (!lang) {
+            lang = options.language && String(options.language).trim()
+                ? this.normalizeLocale(options.language)
                 : this.detectDeviceLocale();
         }
 
-        await this.loadLanguage(lang);
+        await this.loadLanguage(lang, false);
         this.initialized = true;
         this.emitter.emit("languageChanged", lang);
         return lang;
     }
 
-    async loadLanguage(lang) {
-        const normalized = this.normalizeLocale(lang);
-        if (this.currentLanguage === normalized && this.translations[normalized]) {
-            await this.storage.set(this.STORAGE_KEY, normalized);
-            return;
+    async loadLanguage(lang, save = true) {
+        const translations = await this._fetchLanguage(lang);
+        this.translations[lang] = translations || {};
+        this.currentLanguage = lang;
+        if (save) {
+            try {
+                await this.storage.set(this.STORAGE_KEY, lang);
+            } catch (e) {
+                console.warn("Language.loadLanguage() save failed:", e);
+            }
         }
-        const translations = await this._fetchLanguage(normalized);
-        this.translations[normalized] = translations || {};
-        this.currentLanguage = normalized;
-        await this.storage.set(this.STORAGE_KEY, normalized);
     }
 
     async _fetchLanguage(lang) {
         if (this.translations[lang]) return this.translations[lang];
 
-        let loaded = null;
-
         if (this.lazyLoadFn) {
             try {
-                loaded = await this.lazyLoadFn(lang);
-            } catch { }
+                const loaded = await this.lazyLoadFn(lang);
+                if (loaded) return loaded;
+            } catch (e) {
+                console.warn("Language.lazyLoad error:", e);
+            }
         }
 
-        if (!loaded && this.loadFromApiFn) {
+        if (this.loadFromApiFn) {
             try {
-                loaded = await this.loadFromApiFn(lang);
-            } catch { }
+                const res = await this.loadFromApiFn(lang);
+                return res || {};
+            } catch (e) {
+                console.warn("Language.loadFromApi error:", e);
+            }
         }
-
-        if (loaded) return loaded;
 
         return this.translations[this.fallbackLanguage] || {};
     }
 
     async changeLanguage(lang) {
-        await this.loadLanguage(lang);
+        await this.loadLanguage(lang, true);
         this.emitter.emit("languageChanged", lang);
     }
 
@@ -131,17 +143,14 @@ class LanguageManager {
         try {
             const lang = this.currentLanguage || this.fallbackLanguage;
             return new Intl.NumberFormat(lang, options).format(number);
-        } catch (e) {
+        } catch {
             return String(number);
         }
     }
 
     format(type, value, options = {}) {
         try {
-            if (typeof Intl[type] !== "function") {
-                console.warn(`Intl.${type} not found`);
-                return value;
-            }
+            if (typeof Intl[type] !== "function") return value;
             const lang = this.currentLanguage || this.fallbackLanguage;
             const formatter = new Intl[type](lang, options);
             if (typeof formatter.format === "function") return formatter.format(value);
@@ -152,7 +161,10 @@ class LanguageManager {
     }
 }
 
-export const Language = new LanguageManager();
+if (!global._LANGUAGE_SINGLETON_) {
+    global._LANGUAGE_SINGLETON_ = new LanguageManager();
+}
+export const Language = global._LANGUAGE_SINGLETON_;
 
 /* ---------------- React Context ---------------- */
 export const LanguageContext = React.createContext({
@@ -166,14 +178,11 @@ export const LanguageContext = React.createContext({
 
 /* ---------------- Provider ---------------- */
 export class LanguageProvider extends React.Component {
-    constructor(props) {
-        super(props);
-        this.state = { language: Language.currentLanguage };
-    }
+    state = { ready: false, language: null };
 
     async componentDidMount() {
-        await Language.init(this.props);
-        this.setState({ language: Language.currentLanguage });
+        const lang = await Language.init(this.props);
+        this.setState({ language: lang, ready: true });
         this.unsubscribe = Language.onLanguageChange(lang => this.setState({ language: lang }));
     }
 
@@ -182,6 +191,8 @@ export class LanguageProvider extends React.Component {
     }
 
     render() {
+        if (!this.state.ready) return null;
+
         const ctx = {
             language: this.state.language,
             t: Language.t,
@@ -190,6 +201,7 @@ export class LanguageProvider extends React.Component {
             format: Language.format.bind(Language),
             normalizeLocale: Language.normalizeLocale.bind(Language),
         };
+
         return (
             <LanguageContext.Provider value={ctx}>
                 {this.props.children}
@@ -198,7 +210,7 @@ export class LanguageProvider extends React.Component {
     }
 }
 
-/* ---------------- HOC auto inject ---------------- */
+/* ---------------- HOC ---------------- */
 export function withLanguage(WrappedComponent) {
     return function WithLanguageWrapper(props) {
         return (
