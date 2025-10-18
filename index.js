@@ -77,35 +77,33 @@ class LanguageManager {
     async loadLanguage(lang) {
         const normalized = this.normalizeLocale(lang);
         if (this.currentLanguage === normalized && this.translations[normalized]) {
+            await this.storage.set(this.STORAGE_KEY, normalized);
             return;
         }
         const translations = await this._fetchLanguage(normalized);
         this.translations[normalized] = translations || {};
         this.currentLanguage = normalized;
-        try {
-            const saved = await this.storage.get(this.STORAGE_KEY);
-            if (saved !== normalized) {
-                await this.storage.set(this.STORAGE_KEY, normalized);
-            }
-        } catch { }
+        await this.storage.set(this.STORAGE_KEY, normalized);
     }
 
     async _fetchLanguage(lang) {
         if (this.translations[lang]) return this.translations[lang];
 
+        let loaded = null;
+
         if (this.lazyLoadFn) {
             try {
-                const loaded = await this.lazyLoadFn(lang);
-                if (loaded) return loaded;
+                loaded = await this.lazyLoadFn(lang);
             } catch { }
         }
 
-        if (this.loadFromApiFn) {
+        if (!loaded && this.loadFromApiFn) {
             try {
-                const res = await this.loadFromApiFn(lang);
-                return res || {};
+                loaded = await this.loadFromApiFn(lang);
             } catch { }
         }
+
+        if (loaded) return loaded;
 
         return this.translations[this.fallbackLanguage] || {};
     }
@@ -163,6 +161,7 @@ export const LanguageContext = React.createContext({
     changeLanguage: () => { },
     formatNumber: () => { },
     format: () => { },
+    normalizeLocale: () => { },
 });
 
 /* ---------------- Provider ---------------- */
@@ -189,6 +188,7 @@ export class LanguageProvider extends React.Component {
             changeLanguage: Language.changeLanguage.bind(Language),
             formatNumber: Language.formatNumber.bind(Language),
             format: Language.format.bind(Language),
+            normalizeLocale: Language.normalizeLocale.bind(Language),
         };
         return (
             <LanguageContext.Provider value={ctx}>
@@ -211,6 +211,7 @@ export function withLanguage(WrappedComponent) {
                         changeLanguage={ctx.changeLanguage}
                         formatNumber={ctx.formatNumber}
                         format={ctx.format}
+                        normalizeLocale={ctx.normalizeLocale}
                     />
                 )}
             </LanguageContext.Consumer>
